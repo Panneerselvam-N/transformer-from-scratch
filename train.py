@@ -143,10 +143,10 @@ def get_dataset(config):
     print(f"Max target sequence length: {max_tgt_seq_len}")
 
     train_data_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=config["batch_size"], shuffle=True
+        train_dataset, batch_size=config["batch_size"], shuffle=True,num_workers=8,pin_memory=True
     )
     val_data_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=1, shuffle=False
+        val_dataset, batch_size=1, shuffle=False,num_workers=8,pin_memory=True
     )
 
     return train_data_loader, val_data_loader, tokenizer_src, tokenizer_tgt
@@ -172,6 +172,13 @@ def train_model(config):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
+    if config["preload_model"] == "latest":
+        best_path = os.path.join(config['model_folder'], config["checkpoint_name"])
+        if os.path.exists(best_path):
+            config["preload_model"] = "best"
+        else:
+            config["preload_model"] = None
+
     if os.path.exists(config["model_folder"]) == False:
         os.mkdir(config["model_folder"])
 
@@ -182,10 +189,18 @@ def train_model(config):
     optimizer = torch.optim.Adam(model.parameters(), lr=config["lr"],eps=1e-9)
     initial_epoch = 0
     global_step = 0
+    best_loss = float('inf')
     if config["preload_model"] is not None:
-        print(f"Loading model weights from {config['preload_model']}...")
-        pt_path = get_weights_file_path(config, initial_epoch+1)
-        model.load_state_dict(torch.load(pt_path, map_location=device))
+        pt_path = os.path.join(config["model_folder"], config["checkpoint_name"])
+        checkpoint = torch.load(pt_path, map_location=device)
+        if isinstance(checkpoint, dict):
+            model.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            best_loss = checkpoint.get('loss', float('inf'))
+            initial_epoch = checkpoint.get('epoch', 0)
+        else:
+            model.load_state_dict(checkpoint)
+        print(f"Resumed from epoch {initial_epoch} with best loss {best_loss}")
 
     
     loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer_src.token_to_id("[PAD]"),label_smoothing=0.1).to(device)
@@ -221,11 +236,19 @@ def train_model(config):
 
         avg_loss = total_loss / batch_count
         print(f"Epoch {epoch+1}/{config['num_epochs']} - Avg Loss: {avg_loss:.4f}")
-        run_validation(model, val_data_loader, tokenizer_src, tokenizer_tgt, config["seq_len"], device, print, num_of_sample=1)
-        # Save checkpoint every epoch
-        model_save_path = get_weights_file_path(config, epoch+1)
-        torch.save(model.state_dict(), model_save_path)
-        print(f"Model checkpoint saved to {model_save_path}")
+        if avg_loss < best_loss:
+            best_loss = avg_loss
+            checkpoint = {
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': best_loss,
+            }
+            model_save_path = os.path.join(config["model_folder"], config["checkpoint_name"])
+            torch.save(checkpoint, model_save_path)
+            print(f"Best model checkpoint saved to {model_save_path} with loss {best_loss:.4f}")
+        if epoch%5 == 0:
+          run_validation(model, val_data_loader, tokenizer_src, tokenizer_tgt, config["seq_len"], device, print, num_of_sample=1)
 
     print(f"Training completed!")
 
