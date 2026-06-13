@@ -30,7 +30,7 @@ def greedy_decode(model,source,source_mask,tokenizer_src,tokenizer_tgt,max_len,d
         if decoder_input.size(1) == max_len:
             break
             
-        decoder_mask = causal_mask(decoder_input.size(1)).type_as(source_mask).unsqueeze(0).unsqueeze(0).to(device)  # [1, 1, tgt_seq_len, tgt_seq_len]
+        decoder_mask = causal_mask(decoder_input.size(1)).type_as(source_mask).to(device)  # [1, 1, tgt_seq_len, tgt_seq_len]
         out = model.decode(decoder_input, encoder_output, source_mask, decoder_mask)  # [1, tgt_seq_len, d_model]
 
         probs = model.project_output(out[:,-1])
@@ -143,10 +143,10 @@ def get_dataset(config):
     print(f"Max target sequence length: {max_tgt_seq_len}")
 
     train_data_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=config["batch_size"], shuffle=True,num_workers=8,pin_memory=True
+        train_dataset, batch_size=config["batch_size"], shuffle=True,num_workers=2,pin_memory=True
     )
     val_data_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=1, shuffle=False,num_workers=8,pin_memory=True
+        val_dataset, batch_size=1, shuffle=False,num_workers=2,pin_memory=True
     )
 
     return train_data_loader, val_data_loader, tokenizer_src, tokenizer_tgt

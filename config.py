@@ -3,7 +3,7 @@ def get_config():
         "batch_size": 16,
         "num_epochs": 100,
         "lr": 1e-4,
-        "seq_len": 512,
+        "seq_len": 350,
         "d_model": 512,
         "lang_src": "en",
         "lang_tgt": "it",
@@ -19,7 +19,7 @@ def get_config():
         "dropout": 0.1,
         # Set to an integer to limit total dataset size (train+val) for quick debugging on small GPUs.
         # Set to None to use the full dataset.
-        "max_dataset_samples": 1000
+        "max_dataset_samples": 10000
     }
 
     return config
