@@ -30,7 +30,7 @@ def greedy_decode(model,source,source_mask,tokenizer_src,tokenizer_tgt,max_len,d
         if decoder_input.size(1) == max_len:
             break
             
-        decoder_mask = causal_mask(decoder_input.size(1)).type_as(source_mask).to(device)  # [tgt_seq_len, tgt_seq_len]
+        decoder_mask = causal_mask(decoder_input.size(1)).type_as(source_mask).unsqueeze(0).unsqueeze(0).to(device)  # [1, 1, tgt_seq_len, tgt_seq_len]
         out = model.decode(decoder_input, encoder_output, source_mask, decoder_mask)  # [1, tgt_seq_len, d_model]
 
         probs = model.project_output(out[:,-1])
@@ -96,7 +96,7 @@ def get_or_build_tokenizer(config, ds, lang):
 def get_dataset(config):
 
     data_raw = load_dataset(
-        "opus_books", f"{config['lang_src']}-{config['lang_tgt']}", split="train"
+        "Helsinki-NLP/opus_books", f"{config['lang_src']}-{config['lang_tgt']}", split="train"
     )
 
     # Optionally limit dataset size for small-GPU experiments
@@ -203,7 +203,9 @@ def train_model(config):
         print(f"Resumed from epoch {initial_epoch} with best loss {best_loss}")
 
     
-    loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer_src.token_to_id("[PAD]"),label_smoothing=0.1).to(device)
+    loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer_tgt.token_to_id("[PAD]"),label_smoothing=0.1).to(device)
+
+   
 
     for epoch in range(initial_epoch, config["num_epochs"]):
         model.train()

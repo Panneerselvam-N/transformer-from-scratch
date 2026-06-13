@@ -13,7 +13,7 @@ def get_config():
         "checkpoint_name": "model_best.pth",
         "tokenizer_path": "tokenizer.json",
         "experiment_name": "transformer_translation",
-        "dims_ff": 512,
+        "dims_ff": 2048,
         "num_heads": 8,
         "num_layers": 8,
         "dropout": 0.1,
